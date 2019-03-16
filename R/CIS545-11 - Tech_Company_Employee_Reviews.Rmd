@@ -1,0 +1,272 @@
+---
+title: "CIS545-11 - Tech Company Employee Reviews"
+author: "Camilo Riviere"
+date: "14 Mar 2019"
+output:
+  html_document:
+    code_folding: show
+    df_print: paged
+    highlight: tango
+    number_sections: yes
+    theme: readable
+    toc: yes
+    toc_float: yes
+---
+
+## Introduction
+
+The dataset I used is a compiled dataset from Kaggle (https://www.kaggle.com/petersunga/google-amazon-facebook-employee-reviews) which contains 67k employee reviews for the most prestigious tech companies in the United States, such as Google, Netflix, Amazon, Facebook, Apple, and Microsoft. The requirements of the project have requested that we provide a prescriptive analysis for our context and so I will be making a reccomendation at the end of my analysis that will recommend which tech company is the best to work for based on the results of my analysis.
+
+## Methodology
+
+I will be uploading the revised dataset to a local database as per the requirements of the project and I will be conducting the following topics which were covered throughout the lecture portion of CIS545-11 as well as some Exploratory Data Analysis (EDA). Below is a list of the items I will cover in this project:
+
+- EDA
+- Discriptive Analysis (Scatterplots, Histograms, Correlation, etc.)
+- Linear Regression
+- Logistic Regression
+- Database Connections
+- Calculating Averages
+- Prescriptive Analysis
+
+
+## Library Import
+```{r}
+
+# import "RMySQL" library for connecting to locally hosted db.
+library(RMySQL)
+
+# import ggplot for plotting
+library(ggplot2)
+
+# %>%
+library(dplyr)
+
+```
+
+## Connect Data Source
+```{r}
+
+# establish connection to locally hosted db.
+con = dbConnect(MySQL(),user = 'root', password = NULL, dbname = 'employee_review',host = '127.0.0.1',port = 3307)
+
+```
+
+## Extract & Load Data
+```{r}
+
+# send query to retrieve all data from locally hosted db.
+df = dbSendQuery(con, "SELECT * FROM employee_review")
+
+# fetch data.
+df = fetch(df, n = -1)
+
+```
+
+## Data Cleaning
+
+I have cleaned the dataset in Excel and dropped columns from the dataset which are not pertinent for the different types of Analysis that I will be performing on the dataset.
+
+The revised content of the dataset contains the following columns:
+
+- company
+- pros
+- cons
+- overall-ratings
+- work-balance-stars
+- culture-values-stars
+- career-opportunities-stars
+- comp-benefit-stars
+- senior-management-stars
+
+```{r}
+
+# remove id column, not necessary.
+df$id = NULL
+
+```
+No other issues with dataset.
+
+
+## Exploratory Data Analysis
+```{r}
+
+# review_names var for loop
+review_names = colnames(df[4:9])
+index = 1
+
+# print boxplots for each ratings grouped by companies.
+for(i in df[5:9]){
+   print(ggplot(df, aes(fill = company, x = company, y = i, color = company)) +
+          geom_boxplot() +
+          coord_flip() +
+          ggtitle(review_names[index]) +
+          ylab("Rating Score") +
+          xlab("Company") +
+          theme(plot.title = element_text(hjust = 0.5)))
+          index = index + 1
+}
+
+```
+
+
+```{r}
+
+# initialize satisfaction column
+df$Satisfaction = 0
+
+# if ratings > mean(ratings) then employee = satisfied, else unsatisfied.
+# satisfied = 1
+# unsatisfied = 0
+df$Satisfaction = ifelse(df$`overall-ratings` > mean(df$`overall-ratings`), 1, 0) &
+                  ifelse(df$`work-balance-stars` > mean(df$`work-balance-stars`), 1, 0) &
+                  ifelse(df$`culture-values-stars` > mean(df$`culture-values-stars`), 1, 0) &
+                  ifelse(df$`career-opportunities-stars` > mean(df$`career-opportunities-stars`), 1, 0) &
+                  ifelse(df$`comp-benefit-stars` > mean(df$`comp-benefit-stars`), 1, 0) &
+                  ifelse(df$`senior-management-stars` > mean(df$`senior-management-stars`), 1, 0)
+
+# make col type numeric
+df$Satisfaction = as.numeric(df$Satisfaction)
+
+# View num of satisfied and unsatisfied employees.
+paste('Satisfied Employees', sum(df$Satisfaction[df$Satisfaction == 1]))
+paste('Unsatisfied Employees', length(df$Satisfaction[df$Satisfaction == 0]))
+
+# barplot - num of satisfied vs unsatisfied employees grouped by company.
+bp <- df %>%
+      group_by(company) %>%
+      count(Satisfaction)
+
+# convert satisfaction col to logical bool for plot.
+bp$Satisfaction = as.logical(bp$Satisfaction)
+
+print(ggplot(bp, aes(fill = Satisfaction, x = company, y = n)) +
+      geom_bar(position = "dodge", stat = "identity") +
+      ggtitle("Employee Satisfaction") +
+      theme(plot.title = element_text(hjust = 0.5)) +
+      guides(fill = guide_legend(reverse = TRUE)))
+
+```
+
+
+## Descriptive Analysis
+```{r}
+
+# correlation between ratings & satisfaction.
+cor(df[5:9], y = df$Satisfaction)
+
+# loop through & print scatterplot demonstrating relationship between rating & satisfaction.
+review_names = colnames(df[4:9])
+index = 1
+for(i in df[5:9]){
+   print(ggplot(df, aes(fill = review_names[index], i, y = df$Satisfaction)) +
+    geom_point(size = 2, shape = 23) +
+    ggtitle(review_names[index]) +
+    xlab(review_names[index]) +
+    ylab("Satisfaction") +
+    theme(plot.title = element_text(hjust = 0.5)) +
+    guides(fill = guide_legend(title = review_names[index])))
+    index = index + 1
+}
+
+```
+
+
+
+```{r}
+
+# print each rating in stacked bar chart for comparison
+index = 0
+for(i in df[4:10]){
+  print(ggplot(df, aes(fill = company, x = i, color = company)) +
+          geom_histogram() +
+          ggtitle(review_names[index]) +
+          xlab("Rating") +
+          theme(plot.title = element_text(hjust = 0.5)))
+  index = index + 1
+}
+
+```
+
+
+## Data Splitting
+```{r}
+# set analysis data to necessary columns.
+df1 = df[4:10]
+
+# set seed to ensure random number generation.
+set.seed(123)
+
+# generate sample size.
+smp_size = floor(0.75*nrow(df1))
+
+# create training indexes.
+train_ind = sample(seq_len(nrow(df1)), size = smp_size)
+
+# create training set.
+df1.train = df1[train_ind,]
+
+# create test set.
+df1.test = df1[-train_ind,]
+
+# create train set for dependent var.
+satisfaction.train = df1$Satisfaction[train_ind]
+
+# create test set for dependent var.
+satisfaction.test = df1$Satisfaction[-train_ind]
+
+# view summary of training set.
+summary(df1.train)
+
+# view summary of test set.
+summary(df1.test)
+```
+
+## Linear Model
+```{r}
+
+# train lm model
+lm.train = lm(satisfaction.train ~ df1.train$`overall-ratings`, data = df1.train)
+
+# create pred var
+y_pred = predict(lm.train, newdata = 0)
+
+# create conf matrix (cm) to verify accuracy
+cm = table(y_pred, df1.train$Satisfaction)
+
+# print lm
+print(plot(lm.train))
+
+# print cm
+print(cm)
+
+# print correct vs incorrect
+print(mean(y_pred == df1.train$Satisfaction))
+
+```
+
+## Logistic Model
+```{r}
+# train log model
+log.train = glm(satisfaction.train ~ df1.train$`overall-ratings`, data = df1.train)
+
+# create pred var
+y_pred = predict(log.train, newdata = 0)
+
+# create conf matrix (cm) to verify accuracy
+cm = table(y_pred, df1.train$Satisfaction)
+
+# print log model
+print(plot(log.train))
+
+# print cm
+print(cm)
+
+# print correct vs incorrect
+print(mean(y_pred == df1.train$Satisfaction))
+```
+
+## Prescription
+Based on my analysis I would reccomend a prospective tech employee to work at Facebook.
+
+
