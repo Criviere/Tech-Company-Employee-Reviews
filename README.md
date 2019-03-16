@@ -2,6 +2,8 @@
 
 The dataset I used is a compiled dataset from Kaggle (https://www.kaggle.com/petersunga/google-amazon-facebook-employee-reviews) which contains 67k employee reviews for the most prestigious tech companies in the United States, such as Google, Netflix, Amazon, Facebook, Apple, and Microsoft. The requirements of the project have requested that we provide a prescriptive analysis for our context and so I will be making a reccomendation at the end of my analysis that will recommend which tech company is the best to work for based on the results of my analysis.
 
+![Image of Overall-Ratings](https://github.com/Criviere/CIS545-11/blob/master/images/1.png?raw=true)
+
 ## Approach-Methodology
 I will be uploading the revised dataset to a local database as per the requirements of the project and I will be conducting the following topics which were covered throughout the lecture portion of CIS545-11 as well as some Exploratory Data Analysis (EDA). Below is a list of the items I will cover in this project:
 
